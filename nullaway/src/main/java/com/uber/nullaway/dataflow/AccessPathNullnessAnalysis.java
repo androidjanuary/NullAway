@@ -128,10 +128,18 @@ public final class AccessPathNullnessAnalysis {
     }
 
     /**
-     * ToDo: Document or implement in a better way
+     * Forces a run of the access path nullness analysis on the method (or lambda) at the given TreePath.
+     *
+     * Because of caching, if the analysis has run in the past for this particular path, it won't be re run. The
+     * intended usage of this method is to force an analysis pass and thus the execution of any Handler hooks into
+     * the dataflow analysis (such as `onDataflowInitialStore` or `onDataflowVisitX`).
+     *
+     * @param methodPath tree path of the method (or lambda) to analyze.
+     * @param context Javac context
+     * @return the final NullnessStore on exit from the method.
      */
-    public void forceRunOnMethod(TreePath methodPath, Context context) {
-        dataFlow.finalResultForMethod(methodPath, context, nullnessPropagation);
+    public NullnessStore<Nullness> forceRunOnMethod(TreePath methodPath, Context context) {
+        return dataFlow.finalResultForMethod(methodPath, context, nullnessPropagation);
     }
 
     /**

@@ -34,6 +34,7 @@ import com.uber.nullaway.NullabilityUtil;
 
 import org.checkerframework.dataflow.analysis.AbstractValue;
 import org.checkerframework.dataflow.analysis.Analysis;
+import org.checkerframework.dataflow.analysis.AnalysisResult;
 import org.checkerframework.dataflow.analysis.Store;
 import org.checkerframework.dataflow.analysis.TransferFunction;
 import org.checkerframework.dataflow.cfg.CFGBuilder;
@@ -185,7 +186,7 @@ public final class DataFlow {
 
     /**
      *
-     * @param methodPath path to method
+     * @param methodPath path to method (or lambda)
      * @param context Javac context
      * @param transfer transfer functions
      * @param <A> values in abstraction
@@ -198,8 +199,8 @@ public final class DataFlow {
     finalResultForMethod(TreePath methodPath, Context context, T transfer) {
         final Tree leaf = methodPath.getLeaf();
         Preconditions.checkArgument(
-                leaf instanceof MethodTree,
-                "Leaf of exprPath must be of type ExpressionTree, but was %s",
+                leaf instanceof MethodTree || leaf instanceof LambdaExpressionTree,
+                "Leaf of methodPath must be of type MethodTree or LambdaExpressionTree, but was %s",
                 leaf.getClass().getName());
 
         return methodDataflow(methodPath, context, transfer).getAnalysis().getRegularExitStore();

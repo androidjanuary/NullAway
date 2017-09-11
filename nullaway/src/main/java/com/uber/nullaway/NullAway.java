@@ -414,6 +414,7 @@ public class NullAway extends BugChecker implements
     @Override
     public Description matchLambdaExpression(LambdaExpressionTree tree, VisitorState state) {
         Symbol.MethodSymbol methodSymbol = NullabilityUtil.getFunctionalInterfaceMethod(tree);
+        handler.onMatchLambdaExpression(this, tree, state, methodSymbol);
         return checkParamOverriding(tree, tree.getParameters(), methodSymbol, true);
     }
 

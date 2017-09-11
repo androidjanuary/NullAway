@@ -20,6 +20,7 @@ import com.google.common.base.Predicate;
 import com.google.errorprone.dataflow.nullnesspropagation.Nullness;
 import com.google.errorprone.dataflow.nullnesspropagation.TrustingNullnessAnalysis;
 import com.google.errorprone.util.ASTHelpers;
+import com.sun.source.tree.ExpressionTree;
 import com.sun.source.tree.LambdaExpressionTree;
 import com.sun.source.tree.VariableTree;
 import com.sun.tools.javac.code.Symbol;
@@ -142,6 +143,8 @@ public class AccessPathNullnessPropagation implements TransferFunction<Nullness,
 
     private final Handler handler;
 
+    private ExpressionTree lambdaResultExpression;
+
     AccessPathNullnessPropagation(
             Nullness defaultAssumption,
             Predicate<MethodInvocationNode> methodReturnsNonNull,
@@ -169,6 +172,7 @@ public class AccessPathNullnessPropagation implements TransferFunction<Nullness,
     @Override
     public NullnessStore<Nullness> initialStore(
             UnderlyingAST underlyingAST, List<LocalVariableNode> parameters) {
+        lambdaResultExpression = null;
         if (parameters == null) {
             // Documentation of this method states, "parameters is only set if the underlying AST is a
             // method"
@@ -176,6 +180,10 @@ public class AccessPathNullnessPropagation implements TransferFunction<Nullness,
         }
         boolean isLambda = underlyingAST.getKind().equals(UnderlyingAST.Kind.LAMBDA);
         if (isLambda) {
+            LambdaExpressionTree lambdaTree = ((UnderlyingAST.CFGLambda) underlyingAST).getLambdaTree();
+            if (lambdaTree.getBodyKind().equals(LambdaExpressionTree.BodyKind.EXPRESSION)) {
+                lambdaResultExpression = (ExpressionTree) lambdaTree.getBody();
+            }
             return lambdaInitialStore((UnderlyingAST.CFGLambda) underlyingAST, parameters);
         } else {
             return methodInitialStore(underlyingAST, parameters);
@@ -213,6 +221,7 @@ public class AccessPathNullnessPropagation implements TransferFunction<Nullness,
             }
             result.setInformation(AccessPath.fromLocal(param), assumed);
         }
+        result = handler.onDataflowInitialStore(underlyingAST, parameters, result);
         return result.build();
     }
 
@@ -230,7 +239,7 @@ public class AccessPathNullnessPropagation implements TransferFunction<Nullness,
             Nullness assumed = TrustingNullnessAnalysis.hasNullableAnnotation(element) ? NULLABLE : NONNULL;
             result.setInformation(AccessPath.fromLocal(param), assumed);
         }
-        result = handler.onDataflowMethodInitialStore(underlyingAST, parameters, result);
+        result = handler.onDataflowInitialStore(underlyingAST, parameters, result);
         return result.build();
 
     }
@@ -274,6 +283,10 @@ public class AccessPathNullnessPropagation implements TransferFunction<Nullness,
     public TransferResult<Nullness, NullnessStore<Nullness>> visitBooleanLiteral(
             BooleanLiteralNode booleanLiteralNode,
             TransferInput<Nullness, NullnessStore<Nullness>> input) {
+        ExpressionTree t = booleanLiteralNode.getTree();
+        if (lambdaResultExpression == t) {
+            handler.onDataflowVisitLambdaResultExpression(t, input.getThenStore(), input.getElseStore());
+        }
         return noStoreChanges(NONNULL, input);
     }
 
@@ -435,6 +448,10 @@ public class AccessPathNullnessPropagation implements TransferFunction<Nullness,
     @Override
     public TransferResult<Nullness, NullnessStore<Nullness>> visitLessThan(
             LessThanNode lessThanNode, TransferInput<Nullness, NullnessStore<Nullness>> input) {
+        ExpressionTree t = lessThanNode.getTree();
+        if (lambdaResultExpression == t) {
+            handler.onDataflowVisitLambdaResultExpression(t, input.getThenStore(), input.getElseStore());
+        }
         return noStoreChanges(NONNULL, input);
     }
 
@@ -442,6 +459,10 @@ public class AccessPathNullnessPropagation implements TransferFunction<Nullness,
     public TransferResult<Nullness, NullnessStore<Nullness>> visitLessThanOrEqual(
             LessThanOrEqualNode lessThanOrEqualNode,
             TransferInput<Nullness, NullnessStore<Nullness>> input) {
+        ExpressionTree t = lessThanOrEqualNode.getTree();
+        if (lambdaResultExpression == t) {
+            handler.onDataflowVisitLambdaResultExpression(t, input.getThenStore(), input.getElseStore());
+        }
         return noStoreChanges(NONNULL, input);
     }
 
@@ -449,6 +470,10 @@ public class AccessPathNullnessPropagation implements TransferFunction<Nullness,
     public TransferResult<Nullness, NullnessStore<Nullness>> visitGreaterThan(
             GreaterThanNode greaterThanNode,
             TransferInput<Nullness, NullnessStore<Nullness>> input) {
+        ExpressionTree t = greaterThanNode.getTree();
+        if (lambdaResultExpression == t) {
+            handler.onDataflowVisitLambdaResultExpression(t, input.getThenStore(), input.getElseStore());
+        }
         return noStoreChanges(NONNULL, input);
     }
 
@@ -456,6 +481,10 @@ public class AccessPathNullnessPropagation implements TransferFunction<Nullness,
     public TransferResult<Nullness, NullnessStore<Nullness>> visitGreaterThanOrEqual(
             GreaterThanOrEqualNode greaterThanOrEqualNode,
             TransferInput<Nullness, NullnessStore<Nullness>> input) {
+        ExpressionTree t = greaterThanOrEqualNode.getTree();
+        if (lambdaResultExpression == t) {
+            handler.onDataflowVisitLambdaResultExpression(t, input.getThenStore(), input.getElseStore());
+        }
         return noStoreChanges(NONNULL, input);
     }
 
@@ -469,6 +498,10 @@ public class AccessPathNullnessPropagation implements TransferFunction<Nullness,
                 elseUpdates);
         ResultingStore thenStore = updateStore(input.getThenStore(), thenUpdates);
         ResultingStore elseStore = updateStore(input.getElseStore(), elseUpdates);
+        ExpressionTree t = equalToNode.getTree();
+        if (lambdaResultExpression == t) {
+            handler.onDataflowVisitLambdaResultExpression(t, thenStore.store, elseStore.store);
+        }
         return conditionalResult(
                 thenStore.store, elseStore.store, thenStore.storeChanged || elseStore.storeChanged);
     }
@@ -483,6 +516,10 @@ public class AccessPathNullnessPropagation implements TransferFunction<Nullness,
                 elseUpdates);
         ResultingStore thenStore = updateStore(input.getThenStore(), thenUpdates);
         ResultingStore elseStore = updateStore(input.getElseStore(), elseUpdates);
+        ExpressionTree t = notEqualNode.getTree();
+        if (lambdaResultExpression == t) {
+            handler.onDataflowVisitLambdaResultExpression(t, thenStore.store, elseStore.store);
+        }
         return conditionalResult(
                 thenStore.store, elseStore.store, thenStore.storeChanged || elseStore.storeChanged);
     }
@@ -561,6 +598,10 @@ public class AccessPathNullnessPropagation implements TransferFunction<Nullness,
     public TransferResult<Nullness, NullnessStore<Nullness>> visitConditionalAnd(
             ConditionalAndNode conditionalAndNode,
             TransferInput<Nullness, NullnessStore<Nullness>> input) {
+        ExpressionTree t = conditionalAndNode.getTree();
+        if (lambdaResultExpression == t) {
+            handler.onDataflowVisitLambdaResultExpression(t, input.getThenStore(), input.getElseStore());
+        }
         return conditionalResult(input.getThenStore(), input.getElseStore(), NO_STORE_CHANGE);
     }
 
@@ -568,6 +609,10 @@ public class AccessPathNullnessPropagation implements TransferFunction<Nullness,
     public TransferResult<Nullness, NullnessStore<Nullness>> visitConditionalOr(
             ConditionalOrNode conditionalOrNode,
             TransferInput<Nullness, NullnessStore<Nullness>> input) {
+        ExpressionTree t = conditionalOrNode.getTree();
+        if (lambdaResultExpression == t) {
+            handler.onDataflowVisitLambdaResultExpression(t, input.getThenStore(), input.getElseStore());
+        }
         return conditionalResult(input.getThenStore(), input.getElseStore(), NO_STORE_CHANGE);
     }
 
@@ -575,6 +620,11 @@ public class AccessPathNullnessPropagation implements TransferFunction<Nullness,
     public TransferResult<Nullness, NullnessStore<Nullness>> visitConditionalNot(
             ConditionalNotNode conditionalNotNode,
             TransferInput<Nullness, NullnessStore<Nullness>> input) {
+        ExpressionTree t = conditionalNotNode.getTree();
+        if (lambdaResultExpression == t) {
+            handler.onDataflowVisitLambdaResultExpression(
+                    t, /* thenStore= */input.getElseStore(), /* elseStore= */input.getThenStore());
+        }
         boolean storeChanged = !input.getThenStore().equals(input.getElseStore());
         return conditionalResult(/* thenStore= */input.getElseStore(), /* elseStore= */input.getThenStore(),
                                  storeChanged);
